@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Re-render the icon whenever usage changes.
     private func track() {
-        withObservationTracking { status.usage = fetcher.usage } onChange: { [weak self] in
+        withObservationTracking { status.usage = fetcher.displayUsage } onChange: { [weak self] in
             Task { @MainActor in self?.track() }
         }
     }

@@ -43,6 +43,8 @@ struct Usage: Equatable {
 final class UsageFetcher {
     private(set) var usage: Usage?
     private(set) var failed = false // UI shows "—"
+    /// What the UI shows: nil (renders "—") when the last fetch failed.
+    var displayUsage: Usage? { failed ? nil : usage }
     @ObservationIgnored private var timer: Timer?
 
     func start() {
@@ -55,9 +57,13 @@ final class UsageFetcher {
     func refresh() {
         Task {
             let result = try? await Self.fetch()
-            usage = result ?? usage
-            failed = result == nil
+            apply(result)
         }
+    }
+
+    func apply(_ result: Usage?) {
+        usage = result ?? usage
+        failed = result == nil
     }
 
     nonisolated static func fetch() async throws -> Usage {

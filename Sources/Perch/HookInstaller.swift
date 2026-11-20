@@ -7,13 +7,15 @@ enum HookInstaller {
                          "PostToolUse", "SubagentStart", "SubagentStop", "Notification", "UserPromptSubmit"]
 
     static func install(settings: URL, hookPath: String, timeout: Int = 600) throws {
+        // Shell-quoted path; the env var lets the hook self-timeout at timeout - 10s.
+        let command = "PERCH_HOOK_TIMEOUT=\(timeout) '" + hookPath.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
         let original = try read(settings)
         var root = strip(original)
         var hooks = root["hooks"] as? [String: Any] ?? [:]
         for event in events {
             let entry: [String: Any] = [
                 "matcher": event == "PreToolUse" ? "AskUserQuestion" : "*",
-                "hooks": [["type": "command", "command": hookPath, "timeout": timeout] as [String: Any]],
+                "hooks": [["type": "command", "command": command, "timeout": timeout] as [String: Any]],
             ]
             hooks[event] = (hooks[event] as? [Any] ?? []) + [entry]
         }
@@ -63,12 +65,14 @@ enum HookInstaller {
 }
 
 private let destructivePattern = try! NSRegularExpression(pattern: [
-    #"(?:^|[\s;&|(])rm(?:\s|$)"#,
-    #"\bgit\s+clean\b"#,
-    #"\bgit\s+reset\s+--hard\b"#,
+    #"(?:^|[\s;&|('"`/\\])rm(?:\s|$)"#,
+    #"\bgit\s+(?:clean\b|reset\s+--hard\b|checkout\s+--|restore\b|branch\s+-D|stash\s+(?:drop|clear)|push\b.*(?:\s-f\b|--force))"#,
     #"\bfind\b.*\s-delete\b"#,
-    #"\btruncate\b"#,
-    #"(?<![>&\d])>(?![>&])(?!\s*/dev/null)"#, // single `>` overwrite; not >>, 2>&1, or /dev/null
+    #"\b(?:truncate|shred|unlink)\b"#,
+    #"\bdd\b.*\bof="#,
+    #"\bsed\s+(?:-\w*i|--in-place)"#,
+    #"--delete\b"#,
+    #"(?<![>=-])>(?![>&])(?!\s*/dev/null)"#, // single `>` overwrite (incl. &>, 2>); not >>, 2>&1, ->, or /dev/null
 ].joined(separator: "|"))
 
 /// True when a shell command probably deletes or overwrites files (drives the "deletes files" tag and ⌘↵ rule).

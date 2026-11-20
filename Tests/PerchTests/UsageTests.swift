@@ -28,3 +28,14 @@ let usageFixture = #"""
     #expect(Meter.resetText(now.addingTimeInterval(59 * 60), now: now) == "59m")
     #expect(Meter.resetText(now.addingTimeInterval(50 * 3600), now: now) == "2d 2h")
 }
+
+@MainActor @Test func displayUsageIsNilAfterFailure() throws {
+    let f = UsageFetcher()
+    let u = try Usage.decode(Data(usageFixture.utf8))
+    f.apply(u)
+    #expect(f.displayUsage == u)
+    f.apply(nil)
+    #expect(f.displayUsage == nil)
+    f.apply(u)
+    #expect(f.displayUsage == u)
+}

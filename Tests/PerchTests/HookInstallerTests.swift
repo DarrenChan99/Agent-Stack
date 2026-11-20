@@ -37,7 +37,7 @@ let hook = "/Applications/Perch.app/Contents/MacOS/perch-hook"
     let mine = pre.first { ($0["hooks"] as! [[String: Any]]).contains { ($0["command"] as! String).contains("perch-hook") } }!
     #expect(mine["matcher"] as? String == "AskUserQuestion")
     let h = (mine["hooks"] as! [[String: Any]])[0]
-    #expect(h["type"] as? String == "command" && h["command"] as? String == hook && h["timeout"] as? Int == 600)
+    #expect(h["type"] as? String == "command" && h["command"] as? String == "PERCH_HOOK_TIMEOUT=600 '\(hook)'" && h["timeout"] as? Int == 600)
     #expect(hooks["PermissionRequest"]![0]["matcher"] as? String == "*")
     #expect(hooks["Stop"]!.count == 2)
     let model = try load(url)["model"] as? String
@@ -82,10 +82,25 @@ let hook = "/Applications/Perch.app/Contents/MacOS/perch-hook"
 
 @Test func destructiveCommands() {
     for c in ["rm -rf build", "sudo rm file", "ls && rm x", "git clean -fd", "git reset --hard HEAD~1",
-              "find . -name '*.o' -delete", "truncate -s 0 f", "echo hi > file", "cat a>b", "git rm foo"] {
+              "find . -name '*.o' -delete", "truncate -s 0 f", "echo hi > file", "cat a>b", "git rm foo",
+              "/bin/rm -rf x", "xargs -0 /bin/rm", #"\rm x"#, "echo `rm x`", "bash -c 'rm -rf x'", #"sh -c "rm -rf /""#,
+              "cmd &> out.log", "cmd 2> f", "git checkout -- .", "git restore .", "git branch -D foo", "git stash drop",
+              "git push --force", "git push -f origin main", "shred f", "unlink f", "dd if=a of=/dev/disk2",
+              "sed -i s/a/b/ f", "rsync -a --delete a/ b/"] {
         #expect(isDestructive(c), "\(c)")
     }
-    for c in ["ls", "git status", "echo hi >> log", "ls 2>&1", "make 2>/dev/null", "echo hi > /dev/null", "git reset --soft HEAD~1", "grep farm x"] {
+    for c in ["ls", "git status", "echo hi >> log", "ls 2>&1", "make 2>/dev/null", "echo hi > /dev/null", "git reset --soft HEAD~1", "grep farm x", "git commit -m 'a -> b'", "ls --color"] {
         #expect(!isDestructive(c), "\(c)")
     }
+}
+
+@Test func installCommandCarriesTimeoutAndQuotesPath() throws {
+    let url = try tempSettings(nil)
+    try HookInstaller.install(settings: url, hookPath: "/Applications/My Perch's.app/Contents/MacOS/perch-hook", timeout: 60)
+    let hooks = try load(url)["hooks"] as! [String: [[String: Any]]]
+    let h = (hooks["Stop"]![0]["hooks"] as! [[String: Any]])[0]
+    #expect(h["command"] as? String == #"PERCH_HOOK_TIMEOUT=60 '/Applications/My Perch'\''s.app/Contents/MacOS/perch-hook'"#)
+    #expect(h["timeout"] as? Int == 60)
+    try HookInstaller.uninstall(settings: url)
+    #expect(try load(url).count == 0)
 }

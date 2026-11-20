@@ -61,3 +61,9 @@ public extension Protocol {
         }
     }
 }
+
+/// Seconds the hook waits for a reply: PERCH_HOOK_TIMEOUT (default 600, clamped 11...3600) minus 10.
+public func effectiveWaitSeconds(env: [String: String]) -> Int {
+    let n = Double(env["PERCH_HOOK_TIMEOUT"] ?? "").flatMap { $0.isFinite ? $0 : nil } ?? 600
+    return Int(min(max(n, 11), 3600)) - 10
+}
