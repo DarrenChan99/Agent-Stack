@@ -20,6 +20,14 @@ import Testing
         #expect(s.sessions["a"]?.status == want, "\(e) \(t ?? "")")
     }
     #expect(s.sessions["a"]?.project == "proj" && s.sessions["a"]?.bundleId == "com.test")
+    // interrupted Bash: no PostToolUse/Stop, only the idle notification
+    s.apply(ev("PreToolUse", "Bash"))
+    var n = ev("Notification"); n["notification_type"] = "permission_prompt"
+    s.apply(n)
+    #expect(s.sessions["a"]?.status == .running) // other notifications don't change the pose
+    n["notification_type"] = "idle_prompt"
+    s.apply(n)
+    #expect(s.sessions["a"]?.status == .idle)
     s.apply(["session_id": "b", "hook_event_name": "SessionStart", "cwd": "/y", "ppid": 99])
     #expect(s.sessions["b"] == nil) // a bare SessionStart (idle spare) is not an agent
     s.apply(["session_id": "b", "hook_event_name": "UserPromptSubmit", "cwd": "/y", "ppid": 99])

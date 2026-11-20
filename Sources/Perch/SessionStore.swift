@@ -55,6 +55,11 @@ final class SessionStore {
         case "SubagentStop": s.status = .thinking; if let agent { s.subagents[agent] = nil }
         case "UserPromptSubmit", "PostToolUse": s.status = .thinking
         case "Stop": s.status = .idle; s.subagents = [:] // safety net for a missed SubagentStop
+        // Esc / denied permission ends a turn with no PostToolUse or Stop, leaving the last pose stuck;
+        // Claude Code's idle-at-prompt notification (~60s later) is the only signal that it's waiting.
+        case "Notification" where e["notification_type"] as? String == "idle_prompt"
+            || (e["message"] as? String)?.contains("waiting for your input") == true:
+            s.status = .idle; s.subagents = [:]
         default: break
         }
         if ["PostToolUse", "Stop", "UserPromptSubmit"].contains(ev), let path = s.transcriptPath,

@@ -52,6 +52,8 @@ struct AgentList: View {
                         .overlay(Capsule().strokeBorder(Theme.crimsonBright, lineWidth: 1))
                 }
                 Spacer()
+                Button { store.prune(); fetcher.refresh() } label: { Image(systemName: "arrow.clockwise") }
+                    .help("Reload: drop ended agents, refresh usage").foregroundStyle(Theme.textDim)
                 Button { model.dnd.toggle() } label: { Image(systemName: model.dnd ? "moon.fill" : "moon") }
                     .help("Do not disturb").foregroundStyle(model.dnd ? Theme.crimsonSoft : Theme.textDim)
                 Menu { Button("Settings…") { SettingsWindow.show(model: model) }; Button("Quit Perch") { NSApp.terminate(nil) } } label: { Image(systemName: "gearshape") }
