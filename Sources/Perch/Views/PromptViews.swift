@@ -6,12 +6,13 @@ import SwiftUI
 struct PromptHeader: View {
     let session: Session?
     let minimize: () -> Void
+    let onTerminal: () -> Void
     var body: some View {
         HStack(spacing: 8) {
             if let icon = appIcon(session?.bundleId) { Image(nsImage: icon).resizable().frame(width: 16, height: 16) }
             Text(session?.project ?? "Claude").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text)
             Spacer()
-            Button { if let session { Jump.to(session) } } label: { Image(systemName: "terminal") }.help("Jump to app")
+            Button { onTerminal() } label: { Image(systemName: "terminal") }.help("Hand back to terminal")
             Button(action: minimize) { Image(systemName: "minus") }.help("Minimize")
         }.buttonStyle(.plain).foregroundStyle(Theme.textDim)
     }
@@ -22,6 +23,7 @@ struct PermissionView: View {
     let session: Session?
     let queue: PromptQueue
     let minimize: () -> Void
+    @State private var shownAt = Date()
 
     var body: some View {
         guard case .permission(let tool, let input, let suggestions) = item.kind else { return AnyView(EmptyView()) }
@@ -29,7 +31,7 @@ struct PermissionView: View {
             : (input["file_path"] as? String ?? Protocol.line(input))
         let destructive = tool == "Bash" && isDestructive(text)
         return AnyView(VStack(alignment: .leading, spacing: 10) {
-            PromptHeader(session: session, minimize: minimize)
+            PromptHeader(session: session, minimize: minimize, onTerminal: { queue.dismiss(item); if let session { Jump.to(session) } })
             Text(tool).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.textDim)
             ScrollView { Text(text).font(.system(size: 12, design: .monospaced)).foregroundStyle(Theme.text)
                 .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled) }
@@ -38,16 +40,18 @@ struct PermissionView: View {
             if destructive { Label("deletes files", systemImage: "trash").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.crimsonSoft) }
             HStack {
                 if suggestions != nil {
-                    Button("Always allow \(Self.pattern(suggestions) ?? tool)") { queue.allow(item, always: true) }
+                    Button("Always allow \(Self.pattern(suggestions) ?? tool)") { if keyOK { queue.allow(item, always: true) } }
                         .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Theme.textDim).lineLimit(1)
                 }
                 Spacer()
-                Button("Deny") { queue.deny(item) }.buttonStyle(.plain).foregroundStyle(Theme.textDim).keyboardShortcut(.escape, modifiers: [])
-                Button("Allow ↵") { queue.allow(item) }.buttonStyle(PrimaryButtonStyle())
+                Button("Deny") { if keyOK { queue.deny(item) } }.buttonStyle(.plain).foregroundStyle(Theme.textDim).keyboardShortcut(.escape, modifiers: [])
+                Button("Allow ↵") { if keyOK { queue.allow(item) } }.buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.return, modifiers: destructive ? .command : []) // plain ↵ never approves a destructive command
             }
         }.padding(16).frame(width: 340).perchPanel())
     }
+
+    private var keyOK: Bool { PromptQueue.acceptsKey(shownAt: shownAt, now: Date()) }
 
     /// permission_suggestions: [{type:"addRules", rules:[{toolName, ruleContent}], ...}] → "Bash(npm test)"-style label.
     static func pattern(_ s: [[String: Any]]?) -> String? {
@@ -72,7 +76,7 @@ struct QuestionView: View {
         let q = qs[page]
         return AnyView(VStack(alignment: .leading, spacing: 10) {
             HStack {
-                PromptHeader(session: session, minimize: minimize)
+                PromptHeader(session: session, minimize: minimize, onTerminal: { queue.dismiss(item); if let session { Jump.to(session) } })
                 if qs.count > 1 { Text("\(page + 1)/\(qs.count)").font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.textDim) }
             }
             Text(q.text).font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)

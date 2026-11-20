@@ -90,3 +90,35 @@ private func client(_ path: String, _ line: String, readFirst: Bool = true) asyn
     for _ in 0..<100 where !q.items.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
     #expect(q.items.isEmpty)
 }
+
+@MainActor @Test func alwaysAllowSendsOnlyFirstSuggestion() {
+    let q = PromptQueue()
+    var sent: [String?] = []
+    let s: [[String: Any]] = [["type": "addRules", "n": 1], ["type": "setMode", "n": 2]]
+    q.enqueue(sessionId: "a", kind: .permission(tool: "Bash", input: [:], suggestions: s)) { sent.append($0) }
+    q.allow(q.head!, always: true)
+    let d = (obj(sent[0])?["hookSpecificOutput"] as? [String: Any])?["decision"] as? [String: Any]
+    #expect((d?["updatedPermissions"] as? [Any])?.count == 1)
+}
+
+@MainActor @Test func promptHeadSkipsHeldStop() {
+    let q = PromptQueue()
+    q.enqueue(sessionId: "a", kind: .stop) { _ in }
+    #expect(q.promptHead == nil)
+    let id = q.enqueue(sessionId: "b", kind: .permission(tool: "Bash", input: [:], suggestions: nil)) { _ in }
+    #expect(q.promptHead?.id == id && q.head?.sessionId == "a")
+}
+
+@MainActor @Test func dismissClosesWithEmptyReplyAndRemoves() {
+    let q = PromptQueue()
+    var sent: [String?] = []
+    q.enqueue(sessionId: "a", kind: .permission(tool: "Bash", input: [:], suggestions: nil)) { sent.append($0) }
+    q.dismiss(q.head!)
+    #expect(sent.count == 1 && sent[0] == nil && q.items.isEmpty)
+}
+
+@Test func keysIgnoredRightAfterPromptAppears() {
+    let t = Date()
+    #expect(!PromptQueue.acceptsKey(shownAt: t, now: t.addingTimeInterval(0.1)))
+    #expect(PromptQueue.acceptsKey(shownAt: t, now: t.addingTimeInterval(0.5)))
+}

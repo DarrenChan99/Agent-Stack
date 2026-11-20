@@ -25,6 +25,11 @@ struct PromptItem: Identifiable {
 final class PromptQueue {
     private(set) var items: [PromptItem] = []   // FIFO
     var head: PromptItem? { items.first }
+    /// Permission/question prompts only; a held Stop just drives its session row's reply field.
+    var prompts: [PromptItem] { items.filter { if case .stop = $0.kind { false } else { true } } }
+    var promptHead: PromptItem? { prompts.first }
+    /// Ignore Allow/Deny keys right after a prompt appears so a repeated Return can't approve an unseen one.
+    nonisolated static func acceptsKey(shownAt: Date, now: Date) -> Bool { now.timeIntervalSince(shownAt) >= 0.4 }
     func has(session: String) -> Bool { items.contains { $0.sessionId == session } }
 
     @discardableResult
@@ -44,7 +49,7 @@ final class PromptQueue {
 
     func allow(_ item: PromptItem, always: Bool = false) {
         var suggestions: [[String: Any]]?
-        if always, case .permission(_, _, let s) = item.kind { suggestions = s }
+        if always, case .permission(_, _, let s) = item.kind { suggestions = s?.first.map { [$0] } } // label names rules[0] only
         finish(item, Protocol.permission(allow: true, updatedPermissions: suggestions))
     }
     func deny(_ item: PromptItem, message: String? = nil) { finish(item, Protocol.permission(allow: false, message: message)) }

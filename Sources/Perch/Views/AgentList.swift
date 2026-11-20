@@ -44,8 +44,8 @@ struct AgentList: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text("\(store.sessions.count) 🤖").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
-                if !queue.items.isEmpty {
-                    Button("\(queue.items.count) needs you") { model.showPrompt = true }
+                if !queue.prompts.isEmpty {
+                    Button("\(queue.prompts.count) needs you") { model.showPrompt = true }
                         .buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.crimsonSoft)
                         .padding(.horizontal, 8).padding(.vertical, 2)
                         .overlay(Capsule().strokeBorder(Theme.crimsonBright, lineWidth: 1))
@@ -108,6 +108,10 @@ struct AgentRow: View {
                     .foregroundStyle(session.holdNextStop ? Theme.crimsonSoft : Theme.textFaint)
                 Button { Jump.to(session) } label: { Image(systemName: "terminal") }
                     .help("Jump to app").foregroundStyle(Theme.textDim)
+                if let stopItem {
+                    Button { queue.dismiss(stopItem) } label: { Image(systemName: "xmark.circle") }
+                        .help("Dismiss: let Claude stop normally").foregroundStyle(Theme.textDim)
+                }
             }.buttonStyle(.plain)
             if stopItem != nil {
                 HStack {

@@ -13,20 +13,20 @@ struct PanelRoot: View {
     @Bindable var model: PanelModel
 
     var body: some View {
-        if let item = queue.head, model.pill {
+        if let item = queue.promptHead, model.pill {
             Button { model.pill = false; model.showPrompt = true } label: {
                 HStack(spacing: 6) {
                     Circle().strokeBorder(Theme.crimsonBright, lineWidth: 2).frame(width: 8, height: 8)
-                    Text("\(queue.items.count) needs you · \(store.sessions[item.sessionId]?.project ?? "Claude")")
+                    Text("\(queue.prompts.count) needs you · \(store.sessions[item.sessionId]?.project ?? "Claude")")
                         .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.text)
                 }.padding(.horizontal, 12).padding(.vertical, 6).perchPanel(radius: 16)
             }.buttonStyle(.plain)
-        } else if let item = queue.head, model.showPrompt {
+        } else if let item = queue.promptHead, model.showPrompt {
             let session = store.sessions[item.sessionId]
             switch item.kind {
-            case .permission: PermissionView(item: item, session: session, queue: queue, minimize: { model.pill = true })
+            case .permission: PermissionView(item: item, session: session, queue: queue, minimize: { model.pill = true }).id(item.id)
             case .question: QuestionView(item: item, session: session, queue: queue, minimize: { model.pill = true }).id(item.id)
-            case .stop: AgentList(store: store, queue: queue, fetcher: fetcher, model: model) // reply field lives on the idle row
+            case .stop: EmptyView() // unreachable: promptHead is never a Stop
             }
         } else {
             AgentList(store: store, queue: queue, fetcher: fetcher, model: model)
@@ -57,7 +57,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Status-item click / hotkey: toggle; opens the queue head if something is waiting (hotkey) or the list (click).
     func toggle(prompt: Bool) {
         if panel.isVisible && transient { return hide() }
-        show(prompt: prompt && queue.head != nil, auto: false)
+        show(prompt: prompt && queue.promptHead != nil, auto: false)
     }
 
     func show(prompt: Bool, auto: Bool) {
