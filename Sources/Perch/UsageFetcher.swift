@@ -39,15 +39,26 @@ struct Usage: Equatable {
     }
 }
 
+struct UsageHTTPError: Error { let code: Int; let retryAfter: TimeInterval? }
+
 @MainActor @Observable
 final class UsageFetcher {
     private(set) var usage: Usage?
-    /// Last good usage; "—" only until the first success. A 429/timeout keeps the old numbers.
+    /// Last good usage; "—" only until the first success ever. A 429/timeout keeps the old numbers,
+    /// and they survive relaunches (the auto-rebuild relaunches the app on every commit).
     var displayUsage: Usage? { usage }
     /// Logged-in Claude account, from ~/.claude.json.
     private(set) var email: String?
     @ObservationIgnored private var timer: Timer?
-    @ObservationIgnored private var lastAttempt = Date.distantPast
+    @ObservationIgnored private var nextAllowed = Date.distantPast
+    @ObservationIgnored private var failures = 0
+    @ObservationIgnored private let defaults: UserDefaults
+    private static let cacheKey = "lastUsageJSON"
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        usage = defaults.data(forKey: Self.cacheKey).flatMap { try? Usage.decode($0) }
+    }
 
     func start() {
         refresh()
@@ -57,18 +68,33 @@ final class UsageFetcher {
     }
 
     /// Throttled: panel clicks call this, and hammering the endpoint gets 429s.
+    /// After a failure, waits out Retry-After or an exponential backoff before trying again.
     func refresh() {
-        guard Date().timeIntervalSince(lastAttempt) > 60 else { return }
-        lastAttempt = Date()
+        guard Date() >= nextAllowed else { return }
+        nextAllowed = Date().addingTimeInterval(60)
         Task {
             email = await Task.detached { Self.readEmail() }.value
-            do { apply(try await Self.fetch()) } catch {
-                NSLog("Perch: usage fetch failed: \(error)")
+            do {
+                let data = try await Self.fetch()
+                apply(try Usage.decode(data))
+                defaults.set(data, forKey: Self.cacheKey)
+                failures = 0
+            } catch {
+                failures += 1
+                let wait = Self.backoff(failures: failures, retryAfter: (error as? UsageHTTPError)?.retryAfter)
+                NSLog("Perch: usage fetch failed: \(error); next try in \(Int(wait))s")
                 apply(nil)
-                try? await Task.sleep(for: .seconds(65)) // one retry past the throttle
+                nextAllowed = Date().addingTimeInterval(wait)
+                try? await Task.sleep(for: .seconds(wait))
                 refresh()
             }
         }
+    }
+
+    /// 2m, 4m, 8m, capped at 15m; a server Retry-After wins when it is longer.
+    nonisolated static func backoff(failures: Int, retryAfter: TimeInterval?) -> TimeInterval {
+        let exp = min(60 * pow(2, Double(min(failures, 10))), 900)
+        return max(exp, retryAfter ?? 0)
     }
 
     func apply(_ result: Usage?) {
@@ -83,7 +109,7 @@ final class UsageFetcher {
         return (obj["oauthAccount"] as? [String: Any])?["emailAddress"] as? String
     }
 
-    nonisolated static func fetch() async throws -> Usage {
+    nonisolated static func fetch() async throws -> Data {
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
         req.timeoutInterval = 30
         req.cachePolicy = .reloadIgnoringLocalCacheData
@@ -92,9 +118,12 @@ final class UsageFetcher {
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta") // required by the endpoint (per CodexBar)
         req.setValue("claude-cli/2.1.0 (external, cli)", forHTTPHeaderField: "User-Agent")
         let (data, resp) = try await URLSession.shared.data(for: req)
-        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-        guard code == 200 else { throw NSError(domain: "PerchUsage", code: code) } // code shows in the log line
-        return try Usage.decode(data)
+        let http = resp as? HTTPURLResponse
+        guard http?.statusCode == 200 else {
+            throw UsageHTTPError(code: http?.statusCode ?? 0,
+                                 retryAfter: (http?.value(forHTTPHeaderField: "Retry-After")).flatMap(TimeInterval.init))
+        }
+        return data
     }
 
     /// Claude Code's OAuth token from the login keychain. Never logged.

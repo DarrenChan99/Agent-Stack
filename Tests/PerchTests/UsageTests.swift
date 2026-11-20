@@ -30,7 +30,8 @@ let usageFixture = #"""
 }
 
 @MainActor @Test func failureKeepsLastGoodUsage() throws {
-    let f = UsageFetcher()
+    let d = UserDefaults(suiteName: "perch-test-\(UUID())")!
+    let f = UsageFetcher(defaults: d)
     #expect(f.displayUsage == nil)
     let u = try Usage.decode(Data(usageFixture.utf8))
     f.apply(u)
@@ -39,4 +40,17 @@ let usageFixture = #"""
     #expect(f.displayUsage == u) // a 429 or timeout must not blank the bars
     f.apply(u)
     #expect(f.displayUsage == u)
+}
+
+@MainActor @Test func cachedUsageLoadsOnLaunch() throws {
+    let d = UserDefaults(suiteName: "perch-test-\(UUID())")!
+    d.set(Data(usageFixture.utf8), forKey: "lastUsageJSON")
+    #expect(UsageFetcher(defaults: d).displayUsage?.fiveHour?.pct == 84)
+}
+
+@Test func backoffGrowsAndHonorsRetryAfter() {
+    #expect(UsageFetcher.backoff(failures: 1, retryAfter: nil) == 120)
+    #expect(UsageFetcher.backoff(failures: 3, retryAfter: nil) == 480)
+    #expect(UsageFetcher.backoff(failures: 9, retryAfter: nil) == 900)
+    #expect(UsageFetcher.backoff(failures: 1, retryAfter: 1800) == 1800)
 }
