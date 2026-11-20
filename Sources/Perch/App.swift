@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func track() {
         withObservationTracking {
             status.usage = fetcher.displayUsage
-            status.pendingCount = queue.items.count
+            status.dot = AgentDot.from(statuses: store.sessions.values.map(\.status), pending: queue.items.count)
             status.dnd = panel.model.dnd
         } onChange: { [weak self] in
             Task { @MainActor in self?.track(); self?.queueChanged() }

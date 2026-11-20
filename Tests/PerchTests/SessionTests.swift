@@ -89,3 +89,10 @@ import Testing
     ev("Stop")
     #expect(s.sessions["a"]?.subagents.isEmpty == true)
 }
+
+@Test func menuBarDotShowsMostActionable() {
+    #expect(AgentDot.from(statuses: [], pending: 0) == .none)
+    #expect(AgentDot.from(statuses: [.idle, .idle], pending: 0) == .done)
+    #expect(AgentDot.from(statuses: [.idle, .running], pending: 0) == .working)
+    #expect(AgentDot.from(statuses: [.idle, .running], pending: 1) == .needsYou)
+}
