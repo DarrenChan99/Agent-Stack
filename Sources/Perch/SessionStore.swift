@@ -29,6 +29,8 @@ final class SessionStore {
         guard let id = e["session_id"] as? String else { return }
         let ev = e["hook_event_name"] as? String ?? ""
         if ev == "SessionEnd" { sessions[id] = nil; return }
+        // Pre-warmed background spares fire SessionStart and then sit for hours; only real activity makes an agent.
+        if sessions[id] == nil && ["SessionStart", "Stop", "Notification"].contains(ev) { return }
         var s = sessions[id] ?? Session(id: id, cwd: e["cwd"] as? String ?? "")
         if let cwd = e["cwd"] as? String { s.cwd = cwd }
         if let p = e["ppid"] as? Int { s.ppid = Int32(p) }

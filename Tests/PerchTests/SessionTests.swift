@@ -21,6 +21,9 @@ import Testing
     }
     #expect(s.sessions["a"]?.project == "proj" && s.sessions["a"]?.bundleId == "com.test")
     s.apply(["session_id": "b", "hook_event_name": "SessionStart", "cwd": "/y", "ppid": 99])
+    #expect(s.sessions["b"] == nil) // a bare SessionStart (idle spare) is not an agent
+    s.apply(["session_id": "b", "hook_event_name": "UserPromptSubmit", "cwd": "/y", "ppid": 99])
+    #expect(s.sessions["b"]?.status == .thinking)
     s.prune { $0 != 99 }
     #expect(s.sessions["b"] == nil && s.sessions["a"] != nil)
     s.apply(ev("SessionEnd"))

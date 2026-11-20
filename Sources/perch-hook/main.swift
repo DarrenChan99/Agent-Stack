@@ -6,6 +6,7 @@ signal(SIGPIPE, SIG_IGN)
 
 var input = (try? JSONSerialization.jsonObject(with: FileHandle.standardInput.readDataToEndOfFile())) as? [String: Any] ?? [:]
 let env = ProcessInfo.processInfo.environment
+if env["CLAUDE_MEM_INTERNAL"] != nil { exit(0) } // claude-mem's headless observer sessions aren't the user's agents
 input["ppid"] = Int(getppid())
 input["__CFBundleIdentifier"] = env["__CFBundleIdentifier"]
 input["TERM_PROGRAM"] = env["TERM_PROGRAM"]
