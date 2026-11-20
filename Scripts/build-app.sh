@@ -1,7 +1,6 @@
 #!/bin/bash
 # Build, ad-hoc sign and (re)install ~/Applications/Perch.app, then relaunch it.
 set -euo pipefail
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 cd "$(dirname "$0")/.."
 source Scripts/lock.sh
 mkdir -p "$HOME/Applications"

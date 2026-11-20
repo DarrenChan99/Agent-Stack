@@ -11,10 +11,11 @@ import Testing
 }
 
 @Test func meterBarCells() {
-    #expect(Meter.bar(cells: 10, pct: 0) == "░░░░░░░░░░")
-    #expect(Meter.bar(cells: 10, pct: 100) == "██████████")
-    #expect(Meter.bar(cells: 10, pct: 84) == "████████▒░") // 8.4 cells: 8 full, 0.4 partial -> ▒
-    #expect(Meter.bar(cells: 10, pct: 84).count == 10)
+    #expect(Meter.bar(cells: 10, pct: 0) == "──────────")
+    #expect(Meter.bar(cells: 10, pct: 100) == "━━━━━━━━━━")
+    #expect(Meter.bar(cells: 10, pct: 84) == "━━━━━━━━──") // 8.4 cells: 0.4 rounds down
+    #expect(Meter.bar(cells: 10, pct: 86) == "━━━━━━━━╸─") // 8.6 cells: half cell
+    #expect(Meter.bar(cells: 10, pct: 86).count == 10)
 }
 
 @Test func meterColorLevels() {
