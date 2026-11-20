@@ -91,7 +91,7 @@ struct AgentRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 10) {
-                ArtView(frame: pose.frame)
+                PixelArtView(pixels: { [pose, animal = Animal(sessionId: session.id)] in pose.pixels($0, animal: animal) }, prop: pose.prop)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(session.project).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
@@ -109,6 +109,7 @@ struct AgentRow: View {
                     }.buttonStyle(.plain).font(.system(size: 11))
                     (Text(pose.label).foregroundColor(pose.color) + Text("  ·  \(elapsed)").foregroundColor(Theme.textFaint))
                         .font(.system(size: 11, weight: .medium))
+                    if !subs.isEmpty { subagentIcons }
                     ctxLine.font(.system(size: 10, design: .monospaced))
                 }
             }
@@ -125,7 +126,21 @@ struct AgentRow: View {
         .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(pose == .needsYou ? Theme.crimsonBright.opacity(0.8) : .white.opacity(0.06), lineWidth: 1))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(session.project), \(pose.label), context \(Int(session.ctxPct)) percent")
+        .accessibilityLabel("\(session.project), \(pose.label), context \(Int(session.ctxPct)) percent"
+            + (subs.isEmpty ? "" : ", \(subs.count) subagents: " + subs.map(\.label).joined(separator: ", ")))
+    }
+
+    /// Running subagents' poses, in a stable order so icons don't shuffle.
+    private var subs: [Pose] { session.subagents.sorted { $0.key < $1.key }.map { Pose($0.value, needsYou: false) } }
+
+    /// One tiny icon per running subagent showing what it's doing; "+N" past 4.
+    private var subagentIcons: some View {
+        HStack(spacing: 5) {
+            ForEach(Array(subs.prefix(4).enumerated()), id: \.offset) { _, p in
+                Image(systemName: p.symbol).foregroundStyle(p.color == Theme.textFaint ? Theme.textDim : p.color).help(p.label)
+            }
+            if subs.count > 4 { Text("+\(subs.count - 4)").foregroundStyle(Theme.text) }
+        }.font(.system(size: 10, weight: .semibold))
     }
 
     /// `━━━━━━────────── 42% · 84k`

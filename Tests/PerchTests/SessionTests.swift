@@ -52,3 +52,23 @@ import Testing
     #expect(AppIdentity.walk(from: 5, parent: { _ in 5 }, isApp: { _ in false }) == nil) // loop guard
     _ = AppIdentity.app(ppid: getpid()) // real sysctl walk terminates (xctest may or may not sit under an app)
 }
+
+@MainActor @Test func subagentsTrackedSeparately() {
+    let s = SessionStore()
+    func ev(_ e: String, _ tool: String? = nil, agent: String? = nil) {
+        var d: [String: Any] = ["session_id": "a", "hook_event_name": e, "cwd": "/x", "__CFBundleIdentifier": "c"]
+        d["tool_name"] = tool; d["agent_id"] = agent
+        s.apply(d)
+    }
+    ev("UserPromptSubmit")
+    ev("SubagentStart", agent: "x"); ev("SubagentStart", agent: "y")
+    ev("PreToolUse", "Edit", agent: "x"); ev("PreToolUse", "Grep", agent: "y")
+    #expect(s.sessions["a"]?.subagents == ["x": .writing, "y": .exploring])
+    #expect(s.sessions["a"]?.status == .exploring) // parent is waiting on its subagents, not writing
+    ev("PostToolUse", "Edit", agent: "x")
+    #expect(s.sessions["a"]?.subagents["x"] == .thinking)
+    ev("SubagentStop", agent: "x")
+    #expect(s.sessions["a"]?.subagents == ["y": .exploring])
+    ev("Stop")
+    #expect(s.sessions["a"]?.subagents.isEmpty == true)
+}

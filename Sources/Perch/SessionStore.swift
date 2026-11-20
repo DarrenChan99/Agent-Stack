@@ -15,6 +15,7 @@ struct Session: Identifiable {
     var tokens = 0
     var ctxPct = 0.0
     var holdNextStop = false
+    var subagents: [String: AgentStatus] = [:] // running subagents by agent_id
     var project: String { (cwd as NSString).lastPathComponent }
 }
 
@@ -42,22 +43,32 @@ final class SessionStore {
         }
         s.lastEvent = Date()
         let tool = e["tool_name"] as? String
+        let agent = e["agent_id"] as? String
+        if let agent, ev == "PreToolUse" || ev == "PostToolUse" { // a subagent's tool call: its icon, not the parent's pose
+            s.subagents[agent] = ev == "PostToolUse" ? .thinking : Self.status(for: tool)
+            sessions[id] = s
+            return
+        }
         switch ev {
-        case "PreToolUse":
-            switch tool {
-            case "Edit", "Write", "NotebookEdit", "MultiEdit": s.status = .writing
-            case "Bash": s.status = .running
-            case "Task": s.status = .exploring
-            default: s.status = .thinking
-            }
-        case "SubagentStart": s.status = .exploring
-        case "UserPromptSubmit", "PostToolUse", "SubagentStop": s.status = .thinking
-        case "Stop": s.status = .idle
+        case "PreToolUse": s.status = Self.status(for: tool)
+        case "SubagentStart": s.status = .exploring; if let agent { s.subagents[agent] = .thinking }
+        case "SubagentStop": s.status = .thinking; if let agent { s.subagents[agent] = nil }
+        case "UserPromptSubmit", "PostToolUse": s.status = .thinking
+        case "Stop": s.status = .idle; s.subagents = [:] // safety net for a missed SubagentStop
         default: break
         }
         if ["PostToolUse", "Stop", "UserPromptSubmit"].contains(ev), let path = s.transcriptPath,
            let u = Self.usage(fromTail: Self.tail(path)) { s.tokens = u.tokens; s.ctxPct = u.ctxPct }
         sessions[id] = s
+    }
+
+    static func status(for tool: String?) -> AgentStatus {
+        switch tool {
+        case "Edit", "Write", "NotebookEdit", "MultiEdit": .writing
+        case "Bash": .running
+        case "Task", "Agent", "Grep", "Glob", "WebFetch", "WebSearch": .exploring
+        default: .thinking
+        }
     }
 
     static let termProgramBundle = ["Apple_Terminal": "com.apple.Terminal", "iTerm.app": "com.googlecode.iterm2",
