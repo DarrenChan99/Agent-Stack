@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor @Observable
 final class PanelModel {
-    var dnd = false
+    var dnd = UserDefaults.standard.bool(forKey: "dnd") { didSet { UserDefaults.standard.set(dnd, forKey: "dnd") } }
     var showPrompt = false   // false = agent list
     var pill = false
 }
@@ -53,7 +53,7 @@ struct AgentList: View {
                 Spacer()
                 Button { model.dnd.toggle() } label: { Image(systemName: model.dnd ? "moon.fill" : "moon") }
                     .help("Do not disturb").foregroundStyle(model.dnd ? Theme.crimsonSoft : Theme.textDim)
-                Menu { Button("Quit Perch") { NSApp.terminate(nil) } } label: { Image(systemName: "gearshape") }
+                Menu { Button("Settings…") { SettingsWindow.show(model: model) }; Button("Quit Perch") { NSApp.terminate(nil) } } label: { Image(systemName: "gearshape") }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().foregroundStyle(Theme.textDim)
             }.buttonStyle(.plain)
             if store.sessions.isEmpty {
