@@ -67,7 +67,7 @@ struct AgentList: View {
             MeterView(label: "5H", window: fetcher.displayUsage?.fiveHour)
             MeterView(label: "7D", window: fetcher.displayUsage?.weekly)
             if let email = fetcher.email {
-                Text(email).font(.system(size: 10)).foregroundStyle(Theme.textFaint).lineLimit(1).truncationMode(.middle)
+                Text(email).font(.system(size: 10)).foregroundStyle(.white).lineLimit(1).truncationMode(.middle)
             }
         }
         .padding(16)
