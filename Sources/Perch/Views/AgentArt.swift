@@ -93,7 +93,7 @@ struct PixelArtView: View {
     var px: CGFloat = 3
     var textSize: CGFloat = 12
     let pixels: (Int) -> [[Color?]]
-    let prop: (Int) -> [ArtRow]
+    var prop: (Int) -> [ArtRow] = { _ in [] }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {

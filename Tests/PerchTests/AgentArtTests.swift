@@ -32,17 +32,16 @@ import Testing
 }
 
 @Test func quietOwlIsFixedGrid() {
-    // 20×16 sprite in its palette; all five scenes over 60s keep the same pixel grid and a 3×3 side column.
-    #expect(QuietView.owl.count == 16)
+    // 20×20 sprite in its palette; all five scenes over 60s stay on the same 34×23 grid using known colours.
+    #expect(QuietView.owl.count == 20)
     for row in QuietView.owl {
         #expect(row.count == 20)
-        for c in row { #expect(c == "." || c == "o" || QuietView.palette[c] != nil, "'\(c)'") }
+        for c in row { #expect(c == "." || QuietView.palette[c] != nil, "'\(c)'") }
     }
     for k in 0..<300 {
-        let px = QuietView.pixels(k)
-        #expect(px.count == 16 && px.allSatisfy { $0.count == 20 }, "k=\(k)")
-        let side = QuietView.side(k)
-        #expect(side.count == 3 && side.allSatisfy { $0.map(\.0).joined().count == 3 }, "k=\(k)")
+        let f = QuietView.frame(k)
+        #expect(f.count == QuietView.height && f.allSatisfy { $0.count == QuietView.width }, "k=\(k)")
+        #expect(f.joined().allSatisfy { $0 == "." || QuietView.palette[$0] != nil }, "k=\(k)")
     }
 }
 
