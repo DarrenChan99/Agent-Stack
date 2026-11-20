@@ -109,9 +109,12 @@ struct AgentRow: View {
                                 .help("Dismiss: let Claude stop normally").foregroundStyle(Theme.textDim)
                         }
                     }.buttonStyle(.plain).font(.system(size: 11))
-                    TimelineView(.periodic(from: .now, by: 30)) { _ in // body alone only re-renders on session changes
-                        (Text(pose.label).foregroundColor(pose.color) + Text("  ·  \(elapsed)").foregroundColor(Theme.textFaint))
-                    }.font(.system(size: 11, weight: .medium))
+                    HStack(spacing: 6) {
+                        StatusDot(pose: pose)
+                        TimelineView(.periodic(from: .now, by: 30)) { _ in // body alone only re-renders on session changes
+                            (Text(pose.label).foregroundColor(pose.color) + Text("  ·  \(elapsed)").foregroundColor(Theme.textFaint))
+                        }.font(.system(size: 11, weight: .medium))
+                    }
                     if !subs.isEmpty { subagentIcons }
                     ctxLine.font(.system(size: 10, design: .monospaced))
                 }
@@ -165,5 +168,28 @@ struct AgentRow: View {
     private var elapsed: String {
         let m = Int(Date().timeIntervalSince(session.startedAt) / 60)
         return m >= 60 ? "\(m / 60)h \(m % 60)m" : "\(m)m"
+    }
+}
+
+/// Hollow ring dot (same look as the menu-bar ring): blue breathing glow while working,
+/// still green when done, blinking red when it needs you.
+struct StatusDot: View {
+    let pose: Pose
+
+    var body: some View {
+        TimelineView(.animation(paused: pose == .idle)) { ctx in
+            let t = ctx.date.timeIntervalSinceReferenceDate
+            let (color, alpha): (Color, Double) = switch pose {
+            case .idle: (Theme.green, 1)
+            case .needsYou: (Theme.crimsonBright, t.truncatingRemainder(dividingBy: 1) < 0.5 ? 1 : 0.15) // flash 1Hz
+            default: (Color(hex: 0x6EA8FF), 0.35 + 0.65 * (0.5 + 0.5 * sin(t * .pi))) // fade over 2s
+            }
+            Circle().fill(.black.opacity(0.6))
+                .overlay(Circle().strokeBorder(color, lineWidth: 1.5))
+                .frame(width: 8, height: 8)
+                .opacity(alpha)
+                .shadow(color: pose == .idle ? .clear : color.opacity(alpha), radius: 4)
+        }
+        .accessibilityHidden(true)
     }
 }
