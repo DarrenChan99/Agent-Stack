@@ -59,6 +59,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 enum PerchApp {
     @MainActor static func main() {
+        // Headless setup for Scripts/setup.sh: `Perch --install-hooks` / `--uninstall-hooks`, then exit.
+        let args = CommandLine.arguments
+        if args.contains("--install-hooks") || args.contains("--uninstall-hooks") {
+            let hook = Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/perch-hook").path
+            let saved = UserDefaults.standard.integer(forKey: "hookTimeout")
+            do {
+                if args.contains("--uninstall-hooks") { try HookInstaller.uninstall(settings: SettingsLogic.settingsURL) }
+                else { try HookInstaller.install(settings: SettingsLogic.settingsURL, hookPath: hook,
+                                                 timeout: SettingsLogic.clampTimeout(saved == 0 ? 600 : saved)) }
+                exit(0)
+            } catch { FileHandle.standardError.write(Data("Perch: \(error)\n".utf8)); exit(1) }
+        }
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
