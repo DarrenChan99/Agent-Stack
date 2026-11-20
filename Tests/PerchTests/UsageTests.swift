@@ -29,13 +29,14 @@ let usageFixture = #"""
     #expect(Meter.resetText(now.addingTimeInterval(50 * 3600), now: now) == "2d 2h")
 }
 
-@MainActor @Test func displayUsageIsNilAfterFailure() throws {
+@MainActor @Test func failureKeepsLastGoodUsage() throws {
     let f = UsageFetcher()
+    #expect(f.displayUsage == nil)
     let u = try Usage.decode(Data(usageFixture.utf8))
     f.apply(u)
     #expect(f.displayUsage == u)
     f.apply(nil)
-    #expect(f.displayUsage == nil)
+    #expect(f.displayUsage == u) // a 429 or timeout must not blank the bars
     f.apply(u)
     #expect(f.displayUsage == u)
 }

@@ -43,7 +43,8 @@ struct AgentList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text("\(store.sessions.count) 🤖").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
+                Text(store.sessions.count == 1 ? "1 agent" : "\(store.sessions.count) agents")
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text)
                 if !queue.prompts.isEmpty {
                     Button("\(queue.prompts.count) needs you") { model.showPrompt = true }
                         .buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.crimsonSoft)
@@ -65,6 +66,9 @@ struct AgentList: View {
             }
             MeterView(label: "5H", window: fetcher.displayUsage?.fiveHour)
             MeterView(label: "7D", window: fetcher.displayUsage?.weekly)
+            if let email = fetcher.email {
+                Text(email).font(.system(size: 10)).foregroundStyle(Theme.textFaint).lineLimit(1).truncationMode(.middle)
+            }
         }
         .padding(16)
         .frame(width: 340)

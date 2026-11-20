@@ -42,10 +42,12 @@ struct Usage: Equatable {
 @MainActor @Observable
 final class UsageFetcher {
     private(set) var usage: Usage?
-    private(set) var failed = false // UI shows "—"
-    /// What the UI shows: nil (renders "—") when the last fetch failed.
-    var displayUsage: Usage? { failed ? nil : usage }
+    /// Last good usage; "—" only until the first success. A 429/timeout keeps the old numbers.
+    var displayUsage: Usage? { usage }
+    /// Logged-in Claude account, from ~/.claude.json.
+    private(set) var email: String?
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var lastAttempt = Date.distantPast
 
     func start() {
         refresh()
@@ -54,16 +56,31 @@ final class UsageFetcher {
         }
     }
 
+    /// Throttled: panel clicks call this, and hammering the endpoint gets 429s.
     func refresh() {
+        guard Date().timeIntervalSince(lastAttempt) > 60 else { return }
+        lastAttempt = Date()
         Task {
-            let result = try? await Self.fetch()
-            apply(result)
+            email = await Task.detached { Self.readEmail() }.value
+            do { apply(try await Self.fetch()) } catch {
+                NSLog("Perch: usage fetch failed: \(error)")
+                apply(nil)
+                try? await Task.sleep(for: .seconds(65)) // one retry past the throttle
+                refresh()
+            }
         }
     }
 
     func apply(_ result: Usage?) {
-        usage = result ?? usage
-        failed = result == nil
+        if let result { usage = result }
+    }
+
+    nonisolated static func readEmail() -> String? {
+        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
+        guard let data = try? Data(contentsOf: url),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return (obj["oauthAccount"] as? [String: Any])?["emailAddress"] as? String
     }
 
     nonisolated static func fetch() async throws -> Usage {
@@ -75,7 +92,8 @@ final class UsageFetcher {
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta") // required by the endpoint (per CodexBar)
         req.setValue("claude-cli/2.1.0 (external, cli)", forHTTPHeaderField: "User-Agent")
         let (data, resp) = try await URLSession.shared.data(for: req)
-        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard code == 200 else { throw NSError(domain: "PerchUsage", code: code) } // code shows in the log line
         return try Usage.decode(data)
     }
 

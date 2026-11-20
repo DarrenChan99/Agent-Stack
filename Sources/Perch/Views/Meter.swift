@@ -15,15 +15,13 @@ enum Meter {
         max(0, Int(width / charWidth) - fixedChars)
     }
 
-    /// █ full, ▓/▒ partial last cell, ░ empty.
+    /// ━ used, ╸ half cell, ─ remaining. Static: no shimmer, no shaded blocks.
     static func bar(cells: Int, pct: Double) -> String {
         let exact = Double(cells) * min(max(pct, 0), 100) / 100
-        let full = Int(exact), frac = exact - Double(full)
-        var s = String(repeating: "█", count: full)
-        if full < cells {
-            if frac >= 0.5 { s += "▓" } else if frac >= 0.15 { s += "▒" } else { s += "░" }
-        }
-        return s + String(repeating: "░", count: cells - s.count)
+        let full = Int(exact)
+        var s = String(repeating: "━", count: full)
+        if full < cells && exact - Double(full) >= 0.5 { s += "╸" }
+        return s + String(repeating: "─", count: cells - s.count)
     }
 
     static func resetText(_ date: Date, now: Date = .now) -> String {
@@ -33,42 +31,34 @@ enum Meter {
     }
 
     static let font: NSFont = NSFont(name: "JetBrainsMono-Regular", size: 12) ?? .monospacedSystemFont(ofSize: 12, weight: .regular)
-    static var charWidth: Double { Double(("█" as NSString).size(withAttributes: [.font: font]).width) }
+    static var charWidth: Double { Double(("━" as NSString).size(withAttributes: [.font: font]).width) }
 }
 
-/// `5H ▕███▓▒░░▏ 84%  1h 48m`, sized so the line fills the container exactly.
+/// `5H ━━━━━━━━╸──── 84%  1h 48m`, sized so the line fills the container exactly.
 struct MeterView: View {
     let label: String
     let window: UsageWindow?
 
     var body: some View {
         GeometryReader { geo in
-            TimelineView(.animation(minimumInterval: 0.12)) { ctx in
-                Text(line(width: geo.size.width, t: ctx.date.timeIntervalSinceReferenceDate))
-                    .font(Font(Meter.font)).lineLimit(1).fixedSize()
-            }
+            Text(line(width: geo.size.width)).font(Font(Meter.font)).lineLimit(1).fixedSize()
         }
         .frame(height: 16)
     }
 
-    private func line(width: Double, t: Double) -> AttributedString {
+    private func line(width: Double) -> AttributedString {
         let pctText = window.map { "\(Int($0.pct.rounded()))%" } ?? "—"
         let reset = window?.resetsAt.map { Meter.resetText($0) } ?? ""
         let tail = " \(pctText)" + (reset.isEmpty ? "" : "  \(reset)")
-        let fixed = label.count + 2 /* " ▕" */ + 1 /* ▏ */ + tail.count
+        let fixed = label.count + 1 /* " " */ + tail.count
         let cells = Meter.cellCount(width: width, charWidth: Meter.charWidth, fixedChars: fixed)
         let pct = window?.pct ?? 0
-        let bar = Array(Meter.bar(cells: cells, pct: pct))
-        var s = AttributedString(label + " ▕"); s.foregroundColor = Theme.textDim
-        let filled = bar.prefix { $0 != "░" }.count
-        let shimmer = filled > 0 ? Int(t * 10) % filled : -1
-        for (i, ch) in bar.enumerated() {
-            var c = AttributedString(String(ch))
-            c.foregroundColor = ch == "░" ? Theme.textFaint.opacity(0.5) : (i == shimmer && ch == "█" ? Color.white : Meter.color(pct))
-            s += c
-        }
-        var end = AttributedString("▏"); end.foregroundColor = Theme.textDim
-        var t2 = AttributedString(tail); t2.foregroundColor = window == nil ? Theme.textFaint : Theme.text
-        return s + end + t2
+        let bar = Meter.bar(cells: cells, pct: pct)
+        let used = bar.prefix { $0 != "─" }
+        var s = AttributedString(label + " "); s.foregroundColor = Theme.textDim
+        var u = AttributedString(String(used)); u.foregroundColor = Meter.color(pct)
+        var r = AttributedString(String(bar.dropFirst(used.count))); r.foregroundColor = Theme.textFaint.opacity(0.35)
+        var t = AttributedString(tail); t.foregroundColor = window == nil ? Theme.textFaint : Theme.text
+        return s + u + r + t
     }
 }
