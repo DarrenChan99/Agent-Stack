@@ -46,7 +46,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     init(store: SessionStore, queue: PromptQueue, fetcher: UsageFetcher, anchor: NSStatusBarButton?) {
         self.queue = queue; self.anchor = anchor
         super.init()
-        panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
+        panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false // glass draws its own edge; a window shadow adds a dark bottom rim
         panel.level = .popUpMenu; panel.isFloatingPanel = true; panel.delegate = self
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentViewController = NSHostingController(rootView: PanelRoot(store: store, queue: queue, fetcher: fetcher, model: model))

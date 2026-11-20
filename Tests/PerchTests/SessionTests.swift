@@ -34,6 +34,15 @@ import Testing
     #expect(s.sessions["b"]?.status == .thinking)
     s.prune { $0 != 99 }
     #expect(s.sessions["b"] == nil && s.sessions["a"] != nil)
+    // A turn-ending event that never comes (background job's away-summary, no idle_prompt) mustn't pin a pose forever.
+    s.apply(ev("UserPromptSubmit"))
+    s.prune(now: Date().addingTimeInterval(60)) { _ in true }
+    #expect(s.sessions["a"]?.status == .thinking)
+    s.prune(now: Date().addingTimeInterval(SessionStore.staleAfter + 1)) { _ in true }
+    #expect(s.sessions["a"]?.status == .idle)
+    s.apply(ev("PreToolUse", "Bash"))
+    s.prune(now: Date().addingTimeInterval(SessionStore.staleAfter + 1)) { _ in true }
+    #expect(s.sessions["a"]?.status == .running) // long builds/tests stay Running
     s.apply(ev("SessionEnd"))
     #expect(s.sessions.isEmpty)
 }

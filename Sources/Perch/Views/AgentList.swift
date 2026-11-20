@@ -109,8 +109,9 @@ struct AgentRow: View {
                                 .help("Dismiss: let Claude stop normally").foregroundStyle(Theme.textDim)
                         }
                     }.buttonStyle(.plain).font(.system(size: 11))
-                    (Text(pose.label).foregroundColor(pose.color) + Text("  ·  \(elapsed)").foregroundColor(Theme.textFaint))
-                        .font(.system(size: 11, weight: .medium))
+                    TimelineView(.periodic(from: .now, by: 30)) { _ in // body alone only re-renders on session changes
+                        (Text(pose.label).foregroundColor(pose.color) + Text("  ·  \(elapsed)").foregroundColor(Theme.textFaint))
+                    }.font(.system(size: 11, weight: .medium))
                     if !subs.isEmpty { subagentIcons }
                     ctxLine.font(.system(size: 10, design: .monospaced))
                 }

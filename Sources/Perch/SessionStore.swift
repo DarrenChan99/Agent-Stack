@@ -79,9 +79,19 @@ final class SessionStore {
     static let termProgramBundle = ["Apple_Terminal": "com.apple.Terminal", "iTerm.app": "com.googlecode.iterm2",
                                     "vscode": "com.microsoft.VSCode"]
 
-    /// Drop sessions whose claude process is gone (kill(pid,0) fails with ESRCH).
-    func prune(alive: (Int32) -> Bool = { kill($0, 0) == 0 || errno == EPERM }) {
-        for (id, s) in sessions { if let p = s.ppid, !alive(p) { sessions[id] = nil } }
+    /// Silence after which a pose is stale. Background jobs never get idle_prompt, and side queries (away summary)
+    /// fire a hook with no Stop after, so without this a finished job reads "Thinking" until its process exits.
+    static let staleAfter: TimeInterval = 300
+
+    /// Drop sessions whose claude process is gone (kill(pid,0) fails with ESRCH); idle out stale poses.
+    func prune(now: Date = Date(), alive: (Int32) -> Bool = { kill($0, 0) == 0 || errno == EPERM }) {
+        for (id, s) in sessions {
+            if let p = s.ppid, !alive(p) { sessions[id] = nil; continue }
+            // ponytail: Bash exempt so long builds stay Running; an Esc'd Bash still relies on idle_prompt.
+            if s.status != .idle, s.status != .running, now.timeIntervalSince(s.lastEvent) > Self.staleAfter {
+                sessions[id]?.status = .idle; sessions[id]?.subagents = [:]
+            }
+        }
     }
 
     func startPruning() {
