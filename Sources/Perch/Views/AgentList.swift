@@ -41,7 +41,7 @@ struct AgentList: View {
     @Bindable var model: PanelModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(store.sessions.count == 1 ? "1 agent" : "\(store.sessions.count) agents")
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text)
@@ -86,37 +86,32 @@ struct AgentRow: View {
         queue.items.first { $0.sessionId == session.id && { if case .stop = $0.kind { true } else { false } }($0) }
     }
 
-    private var symbol: (String, Color) {
-        if queue.has(session: session.id) { return ("exclamationmark.bubble.fill", Theme.crimsonSoft) }
-        switch session.status {
-        case .thinking: return ("ellipsis.circle", Theme.textDim)
-        case .writing: return ("pencil.circle", Theme.green)
-        case .running: return ("terminal", Theme.green)
-        case .exploring: return ("magnifyingglass.circle", Theme.amber)
-        case .idle: return ("pause.circle", Theme.textFaint)
-        }
-    }
+    private var pose: Pose { Pose(session.status, needsYou: queue.has(session: session.id)) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: symbol.0).foregroundStyle(symbol.1)
-                Text(session.project).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text).lineLimit(1)
-                if let icon = appIcon(session.bundleId) { Image(nsImage: icon).resizable().frame(width: 14, height: 14) }
-                Spacer(minLength: 4)
-                metric("number", session.tokens >= 1000 ? "\(session.tokens / 1000)k" : "\(session.tokens)")
-                metric("gauge.medium", "\(Int(session.ctxPct))%")
-                metric("clock", elapsed)
-                Button { store.sessions[session.id]?.holdNextStop.toggle() } label: { Image(systemName: "text.bubble") }
-                    .help("Hold next Stop to reply")
-                    .foregroundStyle(session.holdNextStop ? Theme.crimsonSoft : Theme.textFaint)
-                Button { Jump.to(session) } label: { Image(systemName: "terminal") }
-                    .help("Jump to app").foregroundStyle(Theme.textDim)
-                if let stopItem {
-                    Button { queue.dismiss(stopItem) } label: { Image(systemName: "xmark.circle") }
-                        .help("Dismiss: let Claude stop normally").foregroundStyle(Theme.textDim)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                ArtView(frame: pose.frame)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(session.project).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                        if let icon = appIcon(session.bundleId) { Image(nsImage: icon).resizable().frame(width: 14, height: 14) }
+                        Spacer(minLength: 4)
+                        Button { store.sessions[session.id]?.holdNextStop.toggle() } label: { Image(systemName: "text.bubble") }
+                            .help("Hold next Stop to reply")
+                            .foregroundStyle(session.holdNextStop ? Theme.crimsonSoft : Theme.textFaint)
+                        Button { Jump.to(session) } label: { Image(systemName: "arrow.up.forward.app") }
+                            .help("Jump to app").foregroundStyle(Theme.textDim)
+                        if let stopItem {
+                            Button { queue.dismiss(stopItem) } label: { Image(systemName: "xmark.circle") }
+                                .help("Dismiss: let Claude stop normally").foregroundStyle(Theme.textDim)
+                        }
+                    }.buttonStyle(.plain).font(.system(size: 11))
+                    (Text(pose.label).foregroundColor(pose.color) + Text("  ·  \(elapsed)").foregroundColor(Theme.textFaint))
+                        .font(.system(size: 11, weight: .medium))
+                    ctxLine.font(.system(size: 10, design: .monospaced))
                 }
-            }.buttonStyle(.plain)
+            }
             if stopItem != nil {
                 HStack {
                     TextField("Reply…", text: $reply).textFieldStyle(.plain).onSubmit(send)
@@ -126,6 +121,21 @@ struct AgentRow: View {
                 .padding(8).background(.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
             }
         }
+        .padding(10)
+        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(pose == .needsYou ? Theme.crimsonBright.opacity(0.8) : .white.opacity(0.06), lineWidth: 1))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(session.project), \(pose.label), context \(Int(session.ctxPct)) percent")
+    }
+
+    /// `━━━━━━────────── 42% · 84k`
+    private var ctxLine: Text {
+        let bar = Meter.bar(cells: 16, pct: session.ctxPct)
+        let used = bar.prefix { $0 != "─" }
+        let tok = session.tokens >= 1000 ? "\(session.tokens / 1000)k" : "\(session.tokens)"
+        return Text(String(used)).foregroundColor(Meter.color(session.ctxPct))
+            + Text(String(bar.dropFirst(used.count))).foregroundColor(Theme.textFaint.opacity(0.35))
+            + Text(" \(Int(session.ctxPct))% · \(tok)").foregroundColor(Theme.textFaint)
     }
 
     private func send() {
@@ -137,10 +147,5 @@ struct AgentRow: View {
     private var elapsed: String {
         let m = Int(Date().timeIntervalSince(session.startedAt) / 60)
         return m >= 60 ? "\(m / 60)h \(m % 60)m" : "\(m)m"
-    }
-
-    private func metric(_ icon: String, _ text: String) -> some View {
-        HStack(spacing: 2) { Image(systemName: icon); Text(text) }
-            .font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.textFaint)
     }
 }
