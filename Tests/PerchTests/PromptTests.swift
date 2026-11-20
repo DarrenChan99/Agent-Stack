@@ -122,3 +122,26 @@ private func client(_ path: String, _ line: String, readFirst: Bool = true) asyn
     #expect(!PromptQueue.acceptsKey(shownAt: t, now: t.addingTimeInterval(0.1)))
     #expect(PromptQueue.acceptsKey(shownAt: t, now: t.addingTimeInterval(0.5)))
 }
+
+@MainActor @Test func largeReplyIsWrittenInFull() async {
+    var fds: [Int32] = [0, 0]
+    #expect(socketpair(AF_UNIX, SOCK_STREAM, 0, &fds) == 0)
+    let conn = Connection(fd: fds[0]), rfd = fds[1]
+    conn.start()
+    let payload = String(repeating: "x", count: 100_000)
+    let got: Int = await withCheckedContinuation { k in
+        DispatchQueue.global().async {
+            usleep(200_000) // slow reader: sender hits EAGAIN first
+            var total = 0, buf = [UInt8](repeating: 0, count: 65536)
+            while true {
+                let n = read(rfd, &buf, buf.count)
+                if n <= 0 { break }
+                total += n
+            }
+            close(rfd)
+            k.resume(returning: total)
+        }
+        DispatchQueue.main.async { conn.reply(payload) }
+    }
+    #expect(got == payload.utf8.count + 1)
+}

@@ -36,11 +36,20 @@ final class Connection {
         }
     }
 
-    /// Write one line (small, so a non-blocking write completes) and close.
+    /// Write one line in full and close. On a full send buffer, wait up to 2s for the reader to drain.
+    /// ponytail: blocks main during that wait; move to a write DispatchSource if replies get big or readers slow.
     func reply(_ line: String?) {
         if let line, !closed {
             let out = Array((line + "\n").utf8)
-            _ = write(fd, out, out.count)
+            var off = 0
+            while off < out.count {
+                let n = out[off...].withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+                if n > 0 { off += n; continue }
+                if n < 0 && errno == EINTR { continue }
+                var p = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
+                if n < 0 && errno == EAGAIN && poll(&p, 1, 2000) > 0 { continue }
+                break
+            }
         }
         close()
     }
