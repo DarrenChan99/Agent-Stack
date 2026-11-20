@@ -8,7 +8,7 @@ extension Color {
 
 enum Theme {
     static let crimson = Color(hex: 0xE0354F), crimsonBright = Color(hex: 0xFF6B80), crimsonSoft = Color(hex: 0xFF8597)
-    static let text = Color(hex: 0xF2EEF0), textDim = Color(hex: 0xA39AA1), textFaint = Color(hex: 0x8C838A)
+    static let text = Color.white, textDim = Color.white, textFaint = Color.white
     static let green = Color(hex: 0x6EE7B0), amber = Color(hex: 0xF5C66B)
 }
 
