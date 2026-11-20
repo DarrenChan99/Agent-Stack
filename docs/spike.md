@@ -48,16 +48,21 @@ Run the checklist once in Terminal (`claude`) and once in VS Code's native Claud
 
 | # | Check | Terminal | VS Code |
 |---|-------|----------|---------|
-| 1 | PermissionRequest allow + deny work (trigger a Bash command) | | |
-| 2 | AskUserQuestion answers work: single question, multiple questions, free text | | |
-| 3 | Stop reply (`decision: block`) continues the session | | |
-| 4 | Server down (spike-server not running): normal prompt appears instantly | | |
-| 5 | Server killed (Ctrl-C) mid-wait: normal prompt appears | | |
-| 6 | While the hook is blocking, can the terminal/IDE prompt still be answered? (decides the "jump to terminal" UX) | | |
-| 7 | `updatedPermissions` from `permission_suggestions` works for "Always allow" (use `A`) | | |
-| 8 | What happens when the hook timeout fires? (set `"timeout": 30` and wait) | | |
+| 1 | PermissionRequest allow + deny work (trigger a Bash command) | ASSUMED | ASSUMED |
+| 2 | AskUserQuestion answers work: single question, multiple questions, free text | free text PASS; rest ASSUMED | ASSUMED |
+| 3 | Stop reply (`decision: block`) continues the session | PASS | ASSUMED |
+| 4 | Server down (spike-server not running): normal prompt appears instantly | ASSUMED | ASSUMED |
+| 5 | Server killed (Ctrl-C) mid-wait: normal prompt appears | ASSUMED | ASSUMED |
+| 6 | While the hook is blocking, can the terminal/IDE prompt still be answered? (decides the "jump to terminal" UX) | ASSUMED | ASSUMED |
+| 7 | `updatedPermissions` from `permission_suggestions` works for "Always allow" (use `A`) | ASSUMED | ASSUMED |
+| 8 | What happens when the hook timeout fires? (set `"timeout": 30` and wait) | ASSUMED | ASSUMED |
 
 Also note: does VS Code fire these hooks at all? If not, prompts are Terminal-only for MVP and VS Code sessions only appear in the list.
 
+**Gate: passed on assumption (2026-11-19, owner call).** ASSUMED = untested; revisit if Phase 2+ hits problems.
+
 Notes / field-name corrections found:
 
+- 2026-11-19 Terminal: hook fires for SessionStart/Stop/PreToolUse; `app=?` and `tty=-` on every event (app/tty detection not working).
+- Stop fires after every reply in every session and blocks until answered; real app must not block Stop by default.
+- PermissionRequest does NOT fire in auto mode (no prompt shown, so no hook). Test #1/#7 in default permission mode.
