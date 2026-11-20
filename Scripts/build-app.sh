@@ -38,6 +38,7 @@ cat > "$APP/Contents/Info.plist" <<PL
 <key>CFBundleVersion</key><string>$(git rev-list --count HEAD)</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>LSUIElement</key><true/>
+<key>NSAppleEventsUsageDescription</key><string>Perch brings the Terminal tab running your agent to the front.</string>
 </dict></plist>
 PL
 codesign --force --deep -s - "$APP"

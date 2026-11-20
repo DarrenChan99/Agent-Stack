@@ -12,8 +12,8 @@ struct PromptHeader: View {
             if let icon = appIcon(session?.bundleId) { Image(nsImage: icon).resizable().frame(width: 16, height: 16) }
             Text(session?.project ?? "Claude").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text)
             Spacer()
-            Button { onTerminal() } label: { Image(systemName: "terminal") }.help("Hand back to terminal")
-            Button(action: minimize) { Image(systemName: "minus") }.help("Minimize")
+            Button { onTerminal() } label: { Image(systemName: "terminal").hitBox() }.help("Hand back to terminal")
+            Button(action: minimize) { Image(systemName: "minus").hitBox() }.help("Minimize")
         }.buttonStyle(.plain).foregroundStyle(Theme.textDim)
     }
 }

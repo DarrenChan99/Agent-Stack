@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         panel = PanelController(store: store, queue: queue, fetcher: fetcher, anchor: status.item.button)
         server = SocketServer(store: store, queue: queue)
+        server.dnd = { [panel] in panel?.model.dnd ?? false }
         do { try server.start() } catch { NSLog("Perch: socket server failed: \(error)") } // hooks fail open without it
         status.item.button?.target = self
         status.item.button?.action = #selector(toggle)
@@ -67,7 +68,7 @@ enum PerchApp {
             do {
                 if args.contains("--uninstall-hooks") { try HookInstaller.uninstall(settings: SettingsLogic.settingsURL) }
                 else { try HookInstaller.install(settings: SettingsLogic.settingsURL, hookPath: hook,
-                                                 timeout: SettingsLogic.clampTimeout(saved == 0 ? 600 : saved)) }
+                                                 timeout: SettingsLogic.clampTimeout(saved == 0 ? 120 : saved)) }
                 exit(0)
             } catch { FileHandle.standardError.write(Data("Perch: \(error)\n".utf8)); exit(1) }
         }

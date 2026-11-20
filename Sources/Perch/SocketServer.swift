@@ -71,6 +71,10 @@ final class SocketServer {
     let queue: PromptQueue
     private var listener: DispatchSourceRead?
     var stopHold: Double = 120
+    /// How long a permission/question waits on Perch before Claude gets it back. The card stays red after release
+    /// (status .waiting), so the prompt "sits" in Perch while Claude's own terminal prompt takes over.
+    var promptHold: Double = 90
+    var dnd: () -> Bool = { false }
 
     init(path: String = Protocol.socketPath, store: SessionStore, queue: PromptQueue) {
         self.path = path; self.store = store; self.queue = queue
@@ -105,6 +109,7 @@ final class SocketServer {
         let tool = e["tool_name"] as? String
         store.apply(e)
         guard let sid = e["session_id"] as? String, Protocol.isBlocking(event: ev, tool: tool) else { return c.close() }
+        if ev != "Stop" && dnd() { return c.close() } // DND: never hold Claude for a prompt nobody will see
         let kind: PromptItem.Kind
         switch ev {
         case "PermissionRequest":
@@ -126,9 +131,6 @@ final class SocketServer {
         }
         let id = queue.enqueue(sessionId: sid, kind: kind, reply: { c.reply($0) })
         c.onClose = { [queue] in MainActor.assumeIsolated { queue.remove(id) } }
-        if ev == "Stop" {
-            let hold = stopHold
-            DispatchQueue.main.asyncAfter(deadline: .now() + hold) { c.reply(nil) }
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + (ev == "Stop" ? stopHold : promptHold)) { c.reply(nil) }
     }
 }

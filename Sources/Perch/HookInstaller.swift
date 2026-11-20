@@ -6,7 +6,7 @@ enum HookInstaller {
     static let events = ["PermissionRequest", "PreToolUse", "Stop", "SessionStart", "SessionEnd",
                          "PostToolUse", "SubagentStart", "SubagentStop", "Notification", "UserPromptSubmit"]
 
-    static func install(settings: URL, hookPath: String, timeout: Int = 600) throws {
+    static func install(settings: URL, hookPath: String, timeout: Int = 120) throws {
         // Shell-quoted path; the env var lets the hook self-timeout at timeout - 10s.
         let command = "PERCH_HOOK_TIMEOUT=\(timeout) '" + hookPath.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
         let original = try read(settings)

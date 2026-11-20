@@ -24,7 +24,7 @@ import Testing
     s.apply(ev("PreToolUse", "Bash"))
     var n = ev("Notification"); n["notification_type"] = "permission_prompt"
     s.apply(n)
-    #expect(s.sessions["a"]?.status == .running) // other notifications don't change the pose
+    #expect(s.sessions["a"]?.status == .waiting) // terminal is showing a permission dialog
     n["notification_type"] = "idle_prompt"
     s.apply(n)
     #expect(s.sessions["a"]?.status == .idle)
@@ -95,4 +95,45 @@ import Testing
     #expect(AgentDot.from(statuses: [.idle, .idle], pending: 0) == .done)
     #expect(AgentDot.from(statuses: [.idle, .running], pending: 0) == .working)
     #expect(AgentDot.from(statuses: [.idle, .running], pending: 1) == .needsYou)
+}
+
+/// A released prompt (DND or hold timeout) must keep the card red and never stale out, and bg jobs must be jumpable.
+@MainActor @Test func waitingSurvivesReleaseAndBgJobsJump() {
+    let s = SessionStore()
+    s.apply(["session_id": "j", "hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": "/p", "job": "c918b816"])
+    #expect(s.sessions["j"]?.job == "c918b816")
+    s.apply(["session_id": "j", "hook_event_name": "PermissionRequest", "tool_name": "Bash"])
+    #expect(s.sessions["j"]?.status == .waiting)
+    s.prune(now: Date().addingTimeInterval(3600)) { _ in true }
+    #expect(s.sessions["j"]?.status == .waiting) // a prompt may sit for hours
+    #expect(Pose(.waiting, needsYou: false) == .needsYou)
+    #expect(AgentDot.from(statuses: [.running, .waiting], pending: 0) == .needsYou)
+    s.apply(["session_id": "j", "hook_event_name": "PostToolUse", "tool_name": "Bash"])
+    #expect(s.sessions["j"]?.status == .thinking)
+    s.apply(["session_id": "j", "hook_event_name": "PreToolUse", "tool_name": "AskUserQuestion"])
+    #expect(s.sessions["j"]?.status == .waiting)
+    #expect(Jump.safeJob("c918b816") == "c918b816" && Jump.safeJob("x; rm -rf ~") == nil)
+}
+
+@Test @MainActor func jumpFindsTerminalTTYs() {
+    let ps = """
+      100 ttys003 claude
+      200 ??      claude --bg-pty-host x
+      300 ttys009 /Users/me/.local/bin/claude attach c918b816
+      301 ttys010 claude attach ffff0000
+      302 ttys011 vim attach c918b816
+    """
+    var fg = Session(id: "sess-a", cwd: "/x"); fg.ppid = 100
+    #expect(Jump.ttys(for: fg, ps: ps) == ["/dev/ttys003"])
+    var bg = Session(id: "c918b816-7b43", cwd: "/x"); bg.ppid = 200; bg.job = "c918b816"
+    #expect(Jump.ttys(for: bg, ps: ps) == ["/dev/ttys009"])
+    #expect(Jump.claudeHosts(ps: ps) == [100])
+}
+
+@Test func jumpPicksVSCodeWindowFolder() {
+    let wins = ["/Users/d/Agent-Stack", "/Users/d/Task-Stack", "/Users/d/Agent-Stack/web"]
+    #expect(Jump.vscodeFolder(for: "/Users/d/Task-Stack", openWindows: wins) == "/Users/d/Task-Stack")
+    #expect(Jump.vscodeFolder(for: "/Users/d/Agent-Stack/Sources", openWindows: wins) == "/Users/d/Agent-Stack")
+    #expect(Jump.vscodeFolder(for: "/Users/d/Agent-Stack/web/src", openWindows: wins) == "/Users/d/Agent-Stack/web")
+    #expect(Jump.vscodeFolder(for: "/Users/d/Agent-StackX", openWindows: wins) == "/Users/d/Agent-StackX")
 }

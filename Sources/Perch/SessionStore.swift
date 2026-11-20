@@ -1,7 +1,7 @@
 import AppKit
 import Observation
 
-enum AgentStatus: Equatable { case thinking, writing, running, exploring, idle }
+enum AgentStatus: Equatable { case thinking, writing, running, exploring, idle, waiting } // waiting: a permission/question is up
 
 struct Session: Identifiable {
     let id: String
@@ -9,6 +9,7 @@ struct Session: Identifiable {
     var ppid: Int32?
     var transcriptPath: String?
     var bundleId: String?
+    var job: String?           // background job short id (claude attach <job>)
     var status: AgentStatus = .thinking
     var startedAt = Date()
     var lastEvent = Date()
@@ -36,6 +37,7 @@ final class SessionStore {
         if let cwd = e["cwd"] as? String { s.cwd = cwd }
         if let p = e["ppid"] as? Int { s.ppid = Int32(p) }
         if let t = e["transcript_path"] as? String { s.transcriptPath = t }
+        if let j = e["job"] as? String { s.job = j }
         if s.bundleId == nil { // env value if the hook had it, else walk the parent chain once (cached)
             s.bundleId = (e["__CFBundleIdentifier"] as? String)
                 ?? Self.termProgramBundle[e["TERM_PROGRAM"] as? String ?? ""]
@@ -55,6 +57,8 @@ final class SessionStore {
         case "SubagentStop": s.status = .thinking; if let agent { s.subagents[agent] = nil }
         case "UserPromptSubmit", "PostToolUse": s.status = .thinking
         case "Stop": s.status = .idle; s.subagents = [:] // safety net for a missed SubagentStop
+        case "PermissionRequest": s.status = .waiting
+        case "Notification" where e["notification_type"] as? String == "permission_prompt": s.status = .waiting
         // Esc / denied permission ends a turn with no PostToolUse or Stop, leaving the last pose stuck;
         // Claude Code's idle-at-prompt notification (~60s later) is the only signal that it's waiting.
         case "Notification" where e["notification_type"] as? String == "idle_prompt"
@@ -71,6 +75,7 @@ final class SessionStore {
         switch tool {
         case "Edit", "Write", "NotebookEdit", "MultiEdit": .writing
         case "Bash": .running
+        case "AskUserQuestion": .waiting
         case "Task", "Agent", "Grep", "Glob", "WebFetch", "WebSearch": .exploring
         default: .thinking
         }
@@ -88,7 +93,7 @@ final class SessionStore {
         for (id, s) in sessions {
             if let p = s.ppid, !alive(p) { sessions[id] = nil; continue }
             // ponytail: Bash exempt so long builds stay Running; an Esc'd Bash still relies on idle_prompt.
-            if s.status != .idle, s.status != .running, now.timeIntervalSince(s.lastEvent) > Self.staleAfter {
+            if ![.idle, .running, .waiting].contains(s.status), now.timeIntervalSince(s.lastEvent) > Self.staleAfter {
                 sessions[id]?.status = .idle; sessions[id]?.subagents = [:]
             }
         }

@@ -5,7 +5,7 @@ enum AgentDot: Equatable {
     case none, done, working, needsYou
 
     static func from(statuses: [AgentStatus], pending: Int) -> AgentDot {
-        if pending > 0 { return .needsYou }
+        if pending > 0 || statuses.contains(.waiting) { return .needsYou }
         if statuses.isEmpty { return .none }
         return statuses.contains { $0 != .idle } ? .working : .done
     }

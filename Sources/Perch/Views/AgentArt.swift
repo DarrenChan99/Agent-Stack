@@ -14,6 +14,7 @@ enum Pose: CaseIterable {
         case .running: self = .running
         case .exploring: self = .exploring
         case .idle: self = .idle
+        case .waiting: self = .needsYou
         }
     }
 

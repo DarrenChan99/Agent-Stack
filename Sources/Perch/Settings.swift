@@ -34,7 +34,7 @@ enum SettingsWindow {
 
 struct SettingsView: View {
     @Bindable var model: PanelModel
-    @AppStorage("hookTimeout") private var timeout = 600
+    @AppStorage("hookTimeout") private var timeout = 120
     @State private var installed = SettingsLogic.hooksInstalled(settings: SettingsLogic.settingsURL)
     @State private var error: String?
     @State private var login = LaunchAtLogin.isEnabled

@@ -10,6 +10,7 @@ if env["CLAUDE_MEM_INTERNAL"] != nil { exit(0) } // claude-mem's headless observ
 input["ppid"] = Int(getppid())
 input["__CFBundleIdentifier"] = env["__CFBundleIdentifier"]
 input["TERM_PROGRAM"] = env["TERM_PROGRAM"]
+input["job"] = env["CLAUDE_JOB_DIR"].map { URL(fileURLWithPath: $0).lastPathComponent } // bg job: claude attach <job>
 for fd: Int32 in [0, 1, 2] { if let t = ttyname(fd) { input["tty"] = String(cString: t); break } }
 
 let fd = socket(AF_UNIX, SOCK_STREAM, 0)
