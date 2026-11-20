@@ -2,7 +2,7 @@ import Foundation
 
 /// Merges/removes perch-hook entries in a Claude Code settings.json. JSONSerialization keeps unknown keys intact.
 enum HookInstaller {
-    /// PreToolUse is limited to AskUserQuestion (one entry per event); widen to "*" in Phase 2 if tool status is wanted.
+    /// One entry per event; PreToolUse uses "*" (not just AskUserQuestion) so tool status works; perch-hook branches on tool_name.
     static let events = ["PermissionRequest", "PreToolUse", "Stop", "SessionStart", "SessionEnd",
                          "PostToolUse", "SubagentStart", "SubagentStop", "Notification", "UserPromptSubmit"]
 
@@ -14,7 +14,7 @@ enum HookInstaller {
         var hooks = root["hooks"] as? [String: Any] ?? [:]
         for event in events {
             let entry: [String: Any] = [
-                "matcher": event == "PreToolUse" ? "AskUserQuestion" : "*",
+                "matcher": "*",
                 "hooks": [["type": "command", "command": command, "timeout": timeout] as [String: Any]],
             ]
             hooks[event] = (hooks[event] as? [Any] ?? []) + [entry]

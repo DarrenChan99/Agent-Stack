@@ -35,7 +35,7 @@ let hook = "/Applications/Perch.app/Contents/MacOS/perch-hook"
     #expect(pre.count == 2)
     #expect(pre.contains { $0["matcher"] as? String == "Bash" })
     let mine = pre.first { ($0["hooks"] as! [[String: Any]]).contains { ($0["command"] as! String).contains("perch-hook") } }!
-    #expect(mine["matcher"] as? String == "AskUserQuestion")
+    #expect(mine["matcher"] as? String == "*")
     let h = (mine["hooks"] as! [[String: Any]])[0]
     #expect(h["type"] as? String == "command" && h["command"] as? String == "PERCH_HOOK_TIMEOUT=600 '\(hook)'" && h["timeout"] as? Int == 600)
     #expect(hooks["PermissionRequest"]![0]["matcher"] as? String == "*")
