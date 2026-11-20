@@ -27,7 +27,7 @@ enum StatusIcon {
 
     /// pct: 0...100 or nil (unknown). Past 80% (or DND) the bar outline is a crimson hairline.
     static func image(fiveHour: Double?, weekly: Double?, ring: (NSColor, CGFloat)?, dnd: Bool) -> NSImage {
-        NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+        NSImage(size: NSSize(width: ring == nil ? 18 : 26, height: 18), flipped: false) { _ in
             for (i, pct) in [fiveHour, weekly].enumerated() {
                 let box = NSRect(x: 2 + CGFloat(i) * 8, y: 2, width: 6, height: 14)
                 let outline = NSBezierPath(roundedRect: box.insetBy(dx: 0.25, dy: 0.25), xRadius: 1.5, yRadius: 1.5)
@@ -38,8 +38,8 @@ enum StatusIcon {
                 NSColor.labelColor.setFill()
                 NSBezierPath(roundedRect: NSRect(x: box.minX, y: box.minY, width: box.width, height: h), xRadius: 1.5, yRadius: 1.5).fill()
             }
-            if let (color, alpha) = ring { // hollow ring dot, top right
-                let ring = NSBezierPath(ovalIn: NSRect(x: 11.5, y: 11.5, width: 6, height: 6))
+            if let (color, alpha) = ring { // hollow ring dot, right of the bars
+                let ring = NSBezierPath(ovalIn: NSRect(x: 19, y: 6, width: 6, height: 6))
                 NSColor.black.withAlphaComponent(0.6 * alpha).setFill(); ring.fill()
                 ring.lineWidth = 1.5; color.withAlphaComponent(alpha).setStroke(); ring.stroke()
             }
@@ -50,7 +50,7 @@ enum StatusIcon {
 
 @MainActor
 final class StatusItemController: NSObject {
-    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     var dot = AgentDot.none { didSet { if dot != oldValue { retime() } } }
     var dnd = false { didSet { update() } }
     var usage: Usage? { didSet { update() } }
